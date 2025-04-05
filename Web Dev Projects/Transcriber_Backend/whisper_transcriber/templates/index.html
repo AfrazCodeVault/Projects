@@ -1,0 +1,103 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Audio Translator</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <h1>Upload or Record Audio</h1>
+
+    <form id="audioForm" method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <label>Select Audio File:</label>
+        <input type="file" name="audio" accept="audio/*"><br><br>
+
+        <label>Or Record Audio:</label><br>
+        <button type="button" id="startBtn">🎙️ Start Recording</button>
+        <button type="button" id="stopBtn" disabled>🛑 Stop Recording</button><br><br>
+
+        <audio id="audioPlayback" controls style="display:none;"></audio><br><br>
+
+        <input type="hidden" name="recorded_audio" id="recordedAudioField">
+
+        <label>Input Language:</label>
+        <select name="input_lang">
+            <option value="de">German</option>
+            <option value="en">English</option>
+            <option value="ur">Urdu</option>
+        </select><br><br>
+
+        <label>Output Language:</label>
+        <select name="output_lang">
+            <option value="en">English</option>
+            <option value="ur">Urdu</option>
+            <option value="de">German</option>
+        </select><br><br>
+
+        <button type="submit">Submit</button>
+    </form>
+
+    {% if success %}
+    <h2>✅ Submission Successful</h2>
+    <p><strong>Audio:</strong> {{ audio_name }}</p>
+    <p><strong>Input Language:</strong> {{ input_lang }}</p>
+    <p><strong>Output Language:</strong> {{ output_lang }}</p>
+    <p><strong>Final Result:</strong> {{ final_result }}</p>
+    {% if audio_url %}
+        <audio controls>
+            <source src="{{ audio_url }}" type="audio/webm">
+            Your browser does not support the audio tag.
+        </audio>
+    {% endif %}
+    {% endif %}
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const audioPlayback = document.getElementById('audioPlayback');
+        const form = document.getElementById('audioForm');
+
+        startBtn.onclick = async () => {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+
+            audioChunks = [];
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                audioPlayback.src = audioUrl;
+                audioPlayback.style.display = 'block';
+
+                // Convert blob to File and attach it to the form
+                const file = new File([audioBlob], 'recorded_audio.webm', { type: 'audio/webm' });
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+
+                // Replace file input with our recorded file
+                const fileInput = document.querySelector('input[name="audio"]');
+                fileInput.files = dataTransfer.files;
+            };
+
+            mediaRecorder.start();
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+        };
+
+        stopBtn.onclick = () => {
+            mediaRecorder.stop();
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        };
+    </script>
+</body>
+</html>
